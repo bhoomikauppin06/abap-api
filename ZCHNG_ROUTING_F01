@@ -1,0 +1,365 @@
+*&---------------------------------------------------------------------*
+*& Include          ZCHNG_ROUTING_F01
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*& Form compare_values
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> LS_EXCEL
+*&---------------------------------------------------------------------*
+FORM compare_values  USING    ps_excel TYPE ty_excel_data.
+
+
+ CLEAR lv_update_required.
+
+
+  "--------------------------------------------------
+  " Unit 1
+  "--------------------------------------------------
+
+  IF ls_routing-standardworkquantityunit1 <>
+     ps_excel-unit1.
+
+    lv_update_required = abap_true.
+
+  ENDIF.
+
+
+  "--------------------------------------------------
+  " Activity Type 1
+  "--------------------------------------------------
+
+  IF ls_routing-COSTCTRACTIVITYTYPE1 <>
+     ps_excel-activity_type1.
+
+    lv_update_required = abap_true.
+
+  ENDIF.
+
+
+  "--------------------------------------------------
+  " Unit 2
+  "--------------------------------------------------
+
+  IF ls_routing-STANDARDWORKQUANTITYUNIT2 <>
+     ps_excel-unit2.
+
+    lv_update_required = abap_true.
+
+  ENDIF.
+
+
+  "--------------------------------------------------
+  " Activity Type 2
+  "--------------------------------------------------
+
+  IF ls_routing-COSTCTRACTIVITYTYPE2 <>
+     ps_excel-activity_type2.
+
+    lv_update_required = abap_true.
+
+  ENDIF.
+
+
+  "--------------------------------------------------
+  " Unit 3
+  "--------------------------------------------------
+
+  IF ls_routing-STANDARDWORKQUANTITYUNIT3 <>
+     ps_excel-unit3.
+
+    lv_update_required = abap_true.
+
+  ENDIF.
+
+
+  "--------------------------------------------------
+  " Activity Type 3
+  "--------------------------------------------------
+
+  IF ls_routing-COSTCTRACTIVITYTYPE3 <>
+     ps_excel-activity_type3.
+
+    lv_update_required = abap_true.
+
+  ENDIF.
+
+
+  "--------------------------------------------------
+  " Unit 4
+  "--------------------------------------------------
+
+  IF ls_routing-STANDARDWORKQUANTITYUNIT4 <>
+     ps_excel-unit4.
+
+    lv_update_required = abap_true.
+
+  ENDIF.
+
+
+  "--------------------------------------------------
+  " Activity Type 4
+  "--------------------------------------------------
+
+  IF ls_routing-COSTCTRACTIVITYTYPE4 <>
+     ps_excel-activity_type4.
+
+    lv_update_required = abap_true.
+
+  ENDIF.
+
+
+  "--------------------------------------------------
+  " Unit 5
+  "--------------------------------------------------
+
+  IF ls_routing-STANDARDWORKQUANTITYUNIT5 <>
+     ps_excel-unit5.
+
+    lv_update_required = abap_true.
+
+  ENDIF.
+
+
+  "--------------------------------------------------
+  " Activity Type 5
+  "--------------------------------------------------
+
+  IF ls_routing-COSTCTRACTIVITYTYPE5 <>
+     ps_excel-activity_type5.
+
+    lv_update_required = abap_true.
+
+  ENDIF.
+
+
+  "--------------------------------------------------
+  " Base Quantity
+  "--------------------------------------------------
+
+  lv_sap_value =
+    CONV decfloat34(
+      ls_routing-OPERATIONREFERENCEQUANTITY ).
+
+  lv_target_value =
+    CONV decfloat34(
+      ps_excel-base_quantity ).
+
+  IF lv_sap_value <> lv_target_value.
+
+    lv_update_required = abap_true.
+     WRITE: / 'Base Quantity: DIFFERENT',
+         / '  SAP  :', lv_sap_value,
+         / '  Excel:', lv_target_value.
+
+   ELSE.
+
+  WRITE: / 'Base Quantity: SAME',
+         / '  SAP  :', lv_sap_value,
+         / '  Excel:', lv_target_value.
+
+  ENDIF.
+
+
+  "--------------------------------------------------
+  " Standard Value 1
+  "--------------------------------------------------
+
+  lv_sap_value =
+    CONV decfloat34(
+      ls_routing-STANDARDWORKQUANTITY1 ).
+
+  lv_target_value =
+    CONV decfloat34(
+      ps_excel-standard_value1 ).
+
+  IF lv_sap_value <> lv_target_value.
+
+    lv_update_required = abap_true.
+
+    WRITE: / 'Standard Value 1: DIFFERENT',
+         / '  SAP  :', lv_sap_value,
+         / '  Excel:', lv_target_value.
+
+ELSE.
+
+  WRITE: / 'Standard Value 1: SAME',
+         / '  SAP  :', lv_sap_value,
+         / '  Excel:', lv_target_value.
+
+  ENDIF.
+
+
+  "--------------------------------------------------
+  " Standard Value 2
+  "--------------------------------------------------
+
+  lv_sap_value =
+    CONV decfloat34(
+      ls_routing-STANDARDWORKQUANTITY2 ).
+
+  lv_target_value =
+    CONV decfloat34(
+      ps_excel-standard_value2 ).
+
+  IF lv_sap_value <> lv_target_value.
+
+    lv_update_required = abap_true.
+
+     WRITE: / 'Standard Value 2: DIFFERENT',
+         / '  SAP  :', lv_sap_value,
+         / '  Excel:', lv_target_value.
+
+ELSE.
+
+  WRITE: / 'Standard Value 2: SAME',
+         / '  SAP  :', lv_sap_value,
+         / '  Excel:', lv_target_value.
+
+
+  ENDIF.
+
+
+  "--------------------------------------------------
+  " Standard Value 3
+  "--------------------------------------------------
+
+  lv_sap_value =
+    CONV decfloat34(
+      ls_routing-STANDARDWORKQUANTITY3 ).
+
+  lv_target_value =
+    CONV decfloat34(
+      ps_excel-standard_value3 ).
+
+  IF lv_sap_value <> lv_target_value.
+
+    lv_update_required = abap_true.
+
+    WRITE: / 'Standard Value 3: DIFFERENT',
+         / '  SAP  :', lv_sap_value,
+         / '  Excel:', lv_target_value.
+
+ELSE.
+
+  WRITE: / 'Standard Value 3: SAME',
+         / '  SAP  :', lv_sap_value,
+         / '  Excel:', lv_target_value.
+
+  ENDIF.
+
+
+  "--------------------------------------------------
+  " Standard Value 4
+  "--------------------------------------------------
+
+  lv_sap_value =
+    CONV decfloat34(
+      ls_routing-STANDARDWORKQUANTITY4 ).
+
+  lv_target_value =
+    CONV decfloat34(
+      ps_excel-standard_value4 ).
+
+  IF lv_sap_value <> lv_target_value.
+
+    lv_update_required = abap_true.
+
+     WRITE: / 'Standard Value 4: DIFFERENT',
+         / '  SAP  :', lv_sap_value,
+         / '  Excel:', lv_target_value.
+
+ELSE.
+
+  WRITE: / 'Standard Value 4: SAME',
+         / '  SAP  :', lv_sap_value,
+         / '  Excel:', lv_target_value.
+
+  ENDIF.
+
+
+  "--------------------------------------------------
+  " Standard Value 5
+  "--------------------------------------------------
+
+  lv_sap_value =
+    CONV decfloat34(
+      ls_routing-STANDARDWORKQUANTITY5 ).
+
+  lv_target_value =
+    CONV decfloat34(
+      ps_excel-standard_value5 ).
+
+  IF lv_sap_value <> lv_target_value.
+
+    lv_update_required = abap_true.
+
+     WRITE: / 'Standard Value 5: DIFFERENT',
+         / '  SAP  :', lv_sap_value,
+         / '  Excel:', lv_target_value.
+
+ELSE.
+
+  WRITE: / 'Standard Value 5: SAME',
+         / '  SAP  :', lv_sap_value,
+         / '  Excel:', lv_target_value.
+
+  ENDIF.
+
+ENDFORM.
+
+
+
+*PERFORM ADD_TO_BATCH.
+*&---------------------------------------------------------------------*
+*& Form ADD_TO_BATCH
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM ADD_TO_BATCH USING
+                     ps_excel TYPE TY_EXCEL_DATA .    "BATCH
+
+
+CLEAR GS_BATCH_REQUEST.
+
+
+ gs_batch_request-uri =
+    |ProductionRoutingOperation(ProductionRoutingGroup='{ ls_routing-productionroutinggroup }',| &&
+    |ProductionRouting='{ ls_routing-productionrouting }',| &&
+    |ProductionRoutingSequence='{ ls_routing-productionroutingsequence }',| &&
+    |ProductionRoutingOpIntID='{ ls_routing-productionroutingopintid }',| &&
+    |ProductionRoutingOpIntVersion='{ ls_routing-productionroutingopintversion }')|.
+
+
+
+     gs_batch_request-payload =
+     |\{"OperationReferenceQuantity":"{ ps_excel-base_quantity }",| &&
+
+     |"CostCtrActivityType1":"{ ps_excel-activity_type1 }",| &&
+     |"StandardWorkQuantityUnit1":"{ ps_excel-unit1 }",| &&
+     |"StandardWorkQuantity1":"{ ps_excel-standard_value1 }",| &&
+
+     |"CostCtrActivityType2":"{ ps_excel-activity_type2 }",| &&
+     |"StandardWorkQuantityUnit2":"{ ps_excel-unit2 }",| &&
+     |"StandardWorkQuantity2":"{ ps_excel-standard_value2 }",| &&
+
+     |"CostCtrActivityType3":"{ ps_excel-activity_type3 }",| &&
+     |"StandardWorkQuantityUnit3":"{ ps_excel-unit3 }",| &&
+     |"StandardWorkQuantity3":"{ ps_excel-standard_value3 }",| &&
+
+     |"CostCtrActivityType4":"{ ps_excel-activity_type4 }",| &&
+     |"StandardWorkQuantityUnit4":"{ ps_excel-unit4 }",| &&
+     |"StandardWorkQuantity4":"{ ps_excel-standard_value4 }",| &&
+
+     |"CostCtrActivityType5":"{ ps_excel-activity_type5 }",| &&
+     |"StandardWorkQuantityUnit5":"{ ps_excel-unit5 }",| &&
+     |"StandardWorkQuantity5":"{ ps_excel-standard_value5 }"\}|.
+
+
+     APPEND gs_batch_request TO gt_batch_request.
+
+ENDFORM.
