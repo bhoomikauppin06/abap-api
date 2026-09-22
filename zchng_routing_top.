@@ -1,0 +1,146 @@
+*&---------------------------------------------------------------------*
+*& Include          ZCHNG_ROUTING_TOP
+*&---------------------------------------------------------------------*
+
+*CONSTANTS gc_api_root TYPE string
+*  VALUE '/sap/opu/odata/sap/API_PRODUCTION_ROUTING;v=3'
+
+
+
+DATA:
+  lo_client        TYPE REF TO if_http_client,
+  lv_response      TYPE string,
+  lv_status_code   TYPE i,
+  lv_status_reason TYPE string,
+  lv_csrf_token    TYPE string.
+
+
+TYPES: BEGIN OF ty_excel_data,
+         group             TYPE string,
+         counter           TYPE string,
+         material          TYPE string,
+         plant             TYPE string,
+         operation         TYPE string,
+         base_quantity     TYPE string,
+
+         activity_type1    TYPE string,
+         unit1             TYPE string,
+         standard_value1   TYPE string,
+
+         activity_type2    TYPE string,
+         unit2             TYPE string,
+         standard_value2   TYPE string,
+
+         activity_type3    TYPE string,
+         unit3             TYPE string,
+         standard_value3   TYPE string,
+
+         activity_type4    TYPE string,
+         unit4             TYPE string,
+         standard_value4   TYPE string,
+
+         activity_type5    TYPE string,
+         unit5             TYPE string,
+         standard_value5   TYPE string,
+       END OF ty_excel_data.
+
+DATA gt_excel_data TYPE STANDARD TABLE OF ty_excel_data.
+
+
+       TYPES: BEGIN OF ty_routing,
+         productionroutinggroup        TYPE string,
+         productionrouting             TYPE string,
+         productionroutingsequence     TYPE string,
+         productionroutingopintid      TYPE string,
+         productionroutingopintversion TYPE string,
+         operation                     TYPE string,
+         plant                         TYPE string,
+         operationreferencequantity    TYPE string,
+
+         standardworkquantity1         TYPE string,
+         standardworkquantityunit1     TYPE string,
+         costctractivitytype1         TYPE string,
+
+         standardworkquantity2         TYPE string,
+         standardworkquantityunit2     TYPE string,
+         costctractivitytype2         TYPE string,
+
+         standardworkquantity3         TYPE string,
+         standardworkquantityunit3     TYPE string,
+         costctractivitytype3         TYPE string,
+
+         standardworkquantity4         TYPE string,
+         standardworkquantityunit4     TYPE string,
+         costctractivitytype4         TYPE string,
+
+         standardworkquantity5         TYPE string,
+         standardworkquantityunit5     TYPE string,
+         costctractivitytype5         TYPE string,
+       END OF ty_routing.
+
+
+*       TYPES: BEGIN OF ty_response,
+*         d TYPE ty_routing,
+*       END OF ty_response.
+
+TYPES: BEGIN OF ty_routing_data,
+         results TYPE STANDARD TABLE OF ty_routing WITH DEFAULT KEY,
+       END OF ty_routing_data.
+
+TYPES: BEGIN OF ty_response,
+         d TYPE ty_routing_data,
+       END OF ty_response.
+
+
+
+DATA:
+  ls_response       TYPE ty_response,
+  lv_update_required TYPE abap_bool VALUE abap_false,
+  lv_sap_value      TYPE decfloat34,
+  lv_target_value   TYPE decfloat34.
+
+DATA: ls_routing TYPE ty_routing.
+
+
+TYPES: BEGIN OF ty_header,
+         productionroutinggroup      TYPE string,
+         productionrouting           TYPE string,
+         productionroutinginternalvers TYPE string,
+         plant                       TYPE string,
+         productionroutingusage      TYPE string,
+       END OF ty_header.
+
+TYPES: BEGIN OF ty_header_data,
+        results TYPE STANDARD TABLE OF ty_header WITH DEFAULT KEY,
+       END OF TY_HEADER_DATA.
+
+TYPES: BEGIN OF ty_header_response,
+         d TYPE ty_header_data,
+       END OF ty_header_response.
+
+DATA ls_header_response TYPE ty_header_response.
+
+
+
+TYPES: BEGIN OF ty_batch_request,    "BATCH
+         uri     TYPE string,
+         payload TYPE string,
+       END OF ty_batch_request.
+
+DATA:
+  gt_batch_request TYPE STANDARD TABLE OF ty_batch_request,
+  gs_batch_request TYPE ty_batch_request.
+
+
+TYPES: BEGIN OF ty_batch_result,
+         productionroutingoperation TYPE string,
+         productionroutinggroup     TYPE string,
+         productionrouting          TYPE string,
+         productionroutingsequence  TYPE string,
+         productionroutingopintid   TYPE string,
+         productionroutingopintversion TYPE string,
+         status_code                TYPE i,
+         reason                     TYPE string,
+       END OF ty_batch_result.
+
+DATA gt_batch_result TYPE STANDARD TABLE OF ty_batch_result.
