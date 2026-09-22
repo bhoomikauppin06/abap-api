@@ -1,0 +1,234 @@
+*&---------------------------------------------------------------------*
+*& Include          ZCHNG_ROUTING_EXCEL
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*& Form upload_excel
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM upload_excel .
+
+    DATA: lv_file       TYPE string,
+        lv_xstring    TYPE xstring,
+        lt_binary     TYPE solix_tab,
+        lv_filelength TYPE i.
+
+  DATA: lt_worksheets TYPE if_fdt_doc_spreadsheet=>t_worksheet_names,
+        lv_sheet       TYPE string.
+
+  DATA: lo_excel TYPE REF TO cl_fdt_xl_spreadsheet,
+        lo_data  TYPE REF TO data.
+
+  FIELD-SYMBOLS:
+    <lt_excel> TYPE STANDARD TABLE.
+
+  IF p_file IS INITIAL.
+    MESSAGE 'Please select an Excel file' TYPE 'E'.
+  ENDIF.
+
+  lv_file = p_file.
+
+  "Read Excel file from frontend
+  cl_gui_frontend_services=>gui_upload(
+    EXPORTING
+      filename   = lv_file
+      filetype   = 'BIN'
+    IMPORTING
+      filelength = lv_filelength
+    CHANGING
+      data_tab   = lt_binary ).
+
+  "Convert binary to XSTRING
+  lv_xstring = cl_bcs_convert=>solix_to_xstring(
+                 it_solix = lt_binary ).
+
+  "Create Excel object
+  CREATE OBJECT lo_excel
+    EXPORTING
+      document_name = lv_file
+      xdocument     = lv_xstring.
+
+  "Get worksheet names
+  lo_excel->if_fdt_doc_spreadsheet~get_worksheet_names(
+    IMPORTING
+      worksheet_names = lt_worksheets ).
+
+  IF lt_worksheets IS INITIAL.
+    MESSAGE 'No worksheet found in Excel file' TYPE 'E'.
+  ENDIF.
+
+  "Get first worksheet
+  READ TABLE lt_worksheets INDEX 1 INTO lv_sheet.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Unable to determine worksheet' TYPE 'E'.
+  ENDIF.
+
+  "Read worksheet
+  lo_data =
+    lo_excel->if_fdt_doc_spreadsheet~GET_ITAB_FROM_WORKSHEET(
+      worksheet_name = lv_sheet ).
+
+  IF lo_data IS INITIAL.
+    MESSAGE 'Unable to read Excel data' TYPE 'E'.
+  ENDIF.
+
+  "Assign dynamic Excel table
+  ASSIGN lo_data->* TO <lt_excel>.
+
+  IF <lt_excel> IS NOT ASSIGNED.
+    MESSAGE 'Unable to assign Excel data' TYPE 'E'.
+  ENDIF.
+
+  "Convert Excel data
+  PERFORM convert_excel_data
+    USING <lt_excel>.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form convert_excel_data
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> <LT_EXCEL>
+*&---------------------------------------------------------------------*
+FORM convert_excel_data  USING    pt_excel TYPE STANDARD TABLE.
+
+  FIELD-SYMBOLS:
+    <ls_excel> TYPE any,
+    <lv_field> TYPE any.
+
+  DATA ls_data TYPE ty_excel_data.
+
+  CLEAR gt_excel_data.
+
+  LOOP AT pt_excel ASSIGNING <ls_excel>.
+
+    "Skip header row
+    IF sy-tabix = 1.
+      CONTINUE.
+    ENDIF.
+
+    CLEAR ls_data.
+
+    ASSIGN COMPONENT 1 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      "Task List Type - currently not needed
+    ENDIF.
+
+    ASSIGN COMPONENT 2 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-group = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 3 OF STRUCTURE <ls_excel> TO <lv_field>.
+     IF sy-subrc = 0.
+       ls_data-counter = <lv_field>.
+     ENDIF.
+
+    ASSIGN COMPONENT 4 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-material = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 5 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-plant = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 6 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-operation = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 7 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-base_quantity = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 8 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-activity_type1 = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 9 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-unit1 = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 10 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-standard_value1 = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 11 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-activity_type2 = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 12 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-unit2 = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 13 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-standard_value2 = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 14 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-activity_type3 = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 15 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-unit3 = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 16 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-standard_value3 = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 17 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-activity_type4 = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 18 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-unit4 = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 19 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-standard_value4 = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 20 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-activity_type5 = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 21 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-unit5 = <lv_field>.
+    ENDIF.
+
+    ASSIGN COMPONENT 22 OF STRUCTURE <ls_excel> TO <lv_field>.
+    IF sy-subrc = 0.
+      ls_data-standard_value5 = <lv_field>.
+    ENDIF.
+
+    APPEND ls_data TO gt_excel_data.
+
+  ENDLOOP.
+
+
+
+
+ENDFORM.
