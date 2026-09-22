@@ -1,0 +1,726 @@
+*&---------------------------------------------------------------------*
+*& Include          ZCHNG_ROUTING_API
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*& Form test_api
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM test_api .
+
+  DATA:
+  lv_start_time TYPE timestampl,
+  lv_end_time   TYPE timestampl,
+  lv_elapsed    TYPE decfloat16.
+
+  DATA: lv_start TYPE i,
+        lv_end   TYPE i,
+        lv_diff  TYPE i.
+
+    cl_http_client=>create_by_destination(
+    EXPORTING
+      destination = 'Z_ROUTING_API'
+    IMPORTING
+      client      = lo_client
+    EXCEPTIONS
+      argument_not_found = 1
+      plugin_not_active  = 2
+      internal_error     = 3
+      others             = 4 ).
+
+  IF sy-subrc <> 0.
+    RETURN.
+  ENDIF.
+
+
+  lo_client->propertytype_accept_cookie =
+    if_http_client=>co_enabled.
+
+   " GET request - Fetch CSRF token
+  "------------------------------------------------------------
+
+  lo_client->request->set_method( 'GET' ).
+
+  lo_client->request->set_header_field(
+    name  = 'X-CSRF-Token'
+    value = 'Fetch' ).
+
+  lo_client->request->set_header_field(
+    name  = 'Accept'
+    value = 'application/json' ).
+
+
+  " Operation URI
+  "------------------------------------------------------------
+
+  lo_client->request->set_header_field(
+    name  = '~request_uri'
+    value  = '/sap/opu/odata/sap/API_PRODUCTION_ROUTING;v=3/' ).  "new
+*    value =
+*      '/ProductionRoutingOperation(' &&                          "old
+*      'ProductionRoutingGroup=''50095176'',' &&
+*      'ProductionRouting=''1'',' &&
+*      'ProductionRoutingSequence=''0'',' &&
+*      'ProductionRoutingOpIntID=''1'',' &&
+*      'ProductionRoutingOpIntVersion=''1''' &&
+*      ')' ).
+
+   " Send
+  "------------------------------------------------------------
+
+  lo_client->send(
+    EXCEPTIONS
+      http_communication_failure = 1
+      http_invalid_state         = 2
+      http_processing_failed     = 3
+      others                     = 4 ).
+
+  IF sy-subrc <> 0.
+    RETURN.
+  ENDIF.
+
+
+ " Receive
+  "------------------------------------------------------------
+
+  lo_client->receive(
+    EXCEPTIONS
+      http_communication_failure = 1
+      http_invalid_state         = 2
+      http_processing_failed     = 3
+      others                     = 4 ).
+
+  IF sy-subrc <> 0.
+    RETURN.
+  ENDIF.
+
+
+ " CSRF token
+  "------------------------------------------------------------
+
+  lv_csrf_token =
+    lo_client->response->get_header_field(
+      'X-CSRF-Token' ).
+
+
+" HTTP status
+  "------------------------------------------------------------
+
+  lo_client->response->get_status(
+    IMPORTING
+      code   = lv_status_code
+      reason = lv_status_reason ).
+
+ " Response
+  "------------------------------------------------------------
+
+  lv_response = lo_client->response->get_cdata( ).
+
+
+  /ui2/cl_json=>deserialize(
+    EXPORTING
+      json = lv_response
+    CHANGING
+      data = ls_response ).
+
+  lo_client->request->set_cdata( '' ).
+
+    " Test data
+  "------------------------------------------------------------
+
+WRITE: / 'Excel rows uploaded:', lines( gt_excel_data ).
+
+
+DATA ls_excel TYPE ty_excel_data.
+
+
+
+LOOP AT gt_excel_data INTO ls_excel.
+
+  CLEAR ls_routing.
+
+
+
+  PERFORM get_routing_operation USING ls_excel.
+
+
+
+WRITE: / 'GET time:', lv_elapsed, 'seconds'.
+
+  IF ls_routing-productionroutinggroup IS INITIAL.
+
+    WRITE: / 'Skipping - routing operation not found:',
+             ls_excel-material.
+
+    CONTINUE.
+
+  ENDIF.
+
+  PERFORM compare_values USING ls_excel.
+
+
+  IF lv_update_required = abap_true.
+
+
+PERFORM add_to_batch USING ls_excel.    "NEW
+
+  IF lines( gt_batch_request ) >= p_bsize.
+    " Batch will be sent here in the next step
+
+    GET RUN TIME FIELD lv_start.
+
+    PERFORM SEND_BATCH.
+
+     GET RUN TIME FIELD lv_end.
+
+lv_diff = lv_end - lv_start.
+
+WRITE: / 'BATCH time:', lv_diff, 'microseconds'.
+
+  ENDIF.
+
+*    PERFORM patch_operation USING ls_excel.   "OLD
+
+  ENDIF.
+
+ENDLOOP.
+
+IF lines( gt_batch_request ) > 0.
+
+ GET RUN TIME FIELD lv_start.
+
+
+  PERFORM send_batch.
+
+   GET RUN TIME FIELD lv_end.
+
+lv_diff = lv_end - lv_start.
+
+WRITE: / 'BATCH time:', lv_diff, 'microseconds'.
+
+
+ENDIF.
+
+
+  lo_client->close( ).
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form patch_operation
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> LS_EXCEL
+*&---------------------------------------------------------------------*
+FORM patch_operation  USING    ps_excel TYPE ty_excel_data.
+
+ DATA:
+    lo_client    TYPE REF TO if_http_client,
+    lv_uri       TYPE string,
+    lv_patch_json TYPE string.
+
+  "------------------------------------------------------------
+  " 1. Build the PATCH URI
+  "------------------------------------------------------------
+
+  lv_uri =
+    |/ProductionRoutingOperation(ProductionRoutingGroup='{ ls_routing-productionroutinggroup }',| &&
+    |ProductionRouting='{ ls_routing-productionrouting }',| &&
+    |ProductionRoutingSequence='{ ls_routing-productionroutingsequence }',| &&
+    |ProductionRoutingOpIntID='{ ls_routing-productionroutingopintid }',| &&
+    |ProductionRoutingOpIntVersion='{ ls_routing-productionroutingopintversion }')|.
+
+  "------------------------------------------------------------
+  " 2. Hardcoded test payload
+  "------------------------------------------------------------
+
+  lv_patch_json =
+     |\{"OperationReferenceQuantity":"{ ps_excel-base_quantity }",| &&
+
+     |"CostCtrActivityType1":"{ ps_excel-activity_type1 }",| &&
+     |"StandardWorkQuantityUnit1":"{ ps_excel-unit1 }",| &&
+     |"StandardWorkQuantity1":"{ ps_excel-standard_value1 }",| &&
+
+
+     |"CostCtrActivityType2":"{ ps_excel-activity_type2 }",| &&
+     |"StandardWorkQuantityUnit2":"{ ps_excel-unit2 }",| &&
+     |"StandardWorkQuantity2":"{ ps_excel-standard_value2 }",| &&
+
+     |"CostCtrActivityType3":"{ ps_excel-activity_type3 }",| &&
+     |"StandardWorkQuantityUnit3":"{ ps_excel-unit3 }",| &&
+     |"StandardWorkQuantity3":"{ ps_excel-standard_value3 }",| &&
+
+     |"CostCtrActivityType4":"{ ps_excel-activity_type4 }",| &&
+     |"StandardWorkQuantityUnit4":"{ ps_excel-unit4 }",| &&
+     |"StandardWorkQuantity4":"{ ps_excel-standard_value4 }",| &&
+
+     |"CostCtrActivityType5":"{ ps_excel-activity_type5 }",| &&
+     |"StandardWorkQuantityUnit5":"{ ps_excel-unit5 }",| &&
+     |"StandardWorkQuantity5":"{ ps_excel-standard_value5 }"\}|.
+
+
+  "------------------------------------------------------------
+  " 3. Create HTTP client
+  "------------------------------------------------------------
+
+  cl_http_client=>create_by_destination(
+    EXPORTING
+      destination = 'Z_ROUTING_API'
+    IMPORTING
+      client      = lo_client
+    EXCEPTIONS
+      argument_not_found = 1
+      plugin_not_active  = 2
+      internal_error     = 3
+      others             = 4 ).
+
+  IF sy-subrc <> 0.
+
+    WRITE: / 'ERROR: HTTP client could not be created'.
+
+    RETURN.
+
+  ENDIF.
+
+  "------------------------------------------------------------
+  " 4. Enable cookies
+  "------------------------------------------------------------
+
+  lo_client->propertytype_accept_cookie =
+    if_http_client=>co_enabled.
+
+  "------------------------------------------------------------
+  " 5. Fetch CSRF token
+  "------------------------------------------------------------
+
+  lo_client->request->set_method( 'GET' ).
+
+  lo_client->request->set_header_field(
+    name  = '~request_uri'
+    value = '/sap/opu/odata/sap/API_PRODUCTION_ROUTING;v=3/ProductionRoutingOperation' ).
+*    value = '/ProductionRoutingOperation' ).
+
+  lo_client->request->set_header_field(
+    name  = 'Accept'
+    value = 'application/json' ).
+
+  lo_client->request->set_header_field(
+    name  = 'X-CSRF-Token'
+    value = 'Fetch' ).
+
+  lo_client->send( ).
+  lo_client->receive( ).
+
+  lo_client->response->get_status(
+    IMPORTING
+      code   = lv_status_code
+      reason = lv_status_reason ).
+
+  lv_csrf_token =
+    lo_client->response->get_header_field(
+      'X-CSRF-Token' ).
+
+  WRITE: / 'CSRF STATUS:', lv_status_code.
+  WRITE: / 'CSRF REASON:', lv_status_reason.
+  WRITE: / 'CSRF TOKEN :', lv_csrf_token.
+
+  IF lv_csrf_token IS INITIAL.
+
+    WRITE: / 'ERROR: CSRF token not received'.
+
+    lo_client->close( ).
+
+    RETURN.
+
+  ENDIF.
+
+  "------------------------------------------------------------
+  " 6. Prepare PATCH
+  "------------------------------------------------------------
+
+  lo_client->request->set_method( 'PATCH' ).
+
+  lo_client->request->set_header_field(
+    name  = '~request_uri'
+    value = |/sap/opu/odata/sap/API_PRODUCTION_ROUTING;v=3{ lv_uri }| ).
+*    value = lv_uri ).
+
+  lo_client->request->set_header_field(
+    name  = 'Content-Type'
+    value = 'application/json' ).
+
+  lo_client->request->set_header_field(
+    name  = 'Accept'
+    value = 'application/json' ).
+
+  lo_client->request->set_header_field(
+    name  = 'If-Match'
+    value = '*' ).
+
+  lo_client->request->set_header_field(
+    name  = 'X-CSRF-Token'
+    value = lv_csrf_token ).
+
+  lo_client->request->set_cdata(
+    lv_patch_json ).
+
+  "------------------------------------------------------------
+  " 7. Debug information
+  "------------------------------------------------------------
+
+  WRITE: / '--------------------------------------------'.
+  WRITE: / 'PATCH DEBUG'.
+  WRITE: / '--------------------------------------------'.
+
+  WRITE: / 'URI:'.
+  WRITE: / lv_uri.
+
+  WRITE: / 'JSON:', lv_patch_json.
+
+  WRITE: / 'IF-MATCH: *'.
+
+  "------------------------------------------------------------
+  " 8. Send PATCH
+  "------------------------------------------------------------
+
+  lo_client->send( ).
+  lo_client->receive( ).
+
+  lo_client->response->get_status(
+    IMPORTING
+      code   = lv_status_code
+      reason = lv_status_reason ).
+
+  lv_response =
+    lo_client->response->get_cdata( ).
+
+  "------------------------------------------------------------
+  " 9. Display result
+  "------------------------------------------------------------
+
+  WRITE: / '--------------------------------------------'.
+  WRITE: / 'PATCH RESULT'.
+  WRITE: / '--------------------------------------------'.
+
+  WRITE: / 'STATUS:', lv_status_code.
+  WRITE: / 'REASON:', lv_status_reason.
+
+  IF lv_response IS NOT INITIAL.
+
+    WRITE: / 'RESPONSE:'.
+    WRITE: / lv_response.
+
+  ENDIF.
+
+  IF lv_status_code = 204.
+
+    WRITE: / 'UPDATE SUCCESSFUL'.
+
+  ELSE.
+
+    WRITE: / 'UPDATE FAILED'.
+
+  ENDIF.
+
+  "------------------------------------------------------------
+  " 10. Close HTTP client
+  "------------------------------------------------------------
+
+  lo_client->close( ).
+
+
+ENDFORM.
+
+
+
+*&---------------------------------------------------------------------*
+*& Form get_routing_operation
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_routing_operation USING
+    ps_excel TYPE ty_excel_data.
+
+
+  CLEAR ls_response.
+  CLEAR ls_routing.
+
+
+  DATA: lv_uri         TYPE string.
+
+
+
+
+lv_uri =
+         '/sap/opu/odata/sap/API_PRODUCTION_ROUTING;v=3/ProductionRoutingOperation?$filter=' &&
+    'ProductionRoutingGroup%20eq%20''' &&
+    ps_excel-group &&
+    '''%20and%20ProductionRouting%20eq%20''' &&  ps_excel-COUNTER && ''''.
+
+
+
+
+
+DATA lo_get_client TYPE REF TO if_http_client.
+
+
+cl_http_client=>create_by_destination(
+  EXPORTING
+    destination = 'Z_ROUTING_API'
+  IMPORTING
+    client      = lo_get_client
+  EXCEPTIONS
+    argument_not_found = 1
+    plugin_not_active  = 2
+    internal_error     = 3
+    others             = 4 ).
+
+IF sy-subrc <> 0.
+  WRITE: / 'Unable to create GET client'.
+  RETURN.
+ENDIF.
+
+lo_get_client->propertytype_accept_cookie =
+  if_http_client=>co_enabled.
+
+
+LO_GET_CLIENT->request->set_method( 'GET' ).
+
+  LO_GET_CLIENT->request->set_header_field(
+    name  = '~request_uri'
+    value = lv_uri ).
+
+  LO_GET_CLIENT->request->set_header_field(
+    name  = 'Accept'
+    value = 'application/json' ).
+
+  LO_GET_CLIENT->send( ).
+
+  LO_GET_CLIENT->receive( ).
+
+
+  lv_response = LO_GET_CLIENT->response->get_cdata( ).
+
+  LO_GET_CLIENT->response->get_status(
+    IMPORTING
+      code   = lv_status_code
+      reason = lv_status_reason ).
+
+   WRITE: / 'HTTP Status:', lv_status_code.
+  WRITE: / 'Reason     :', lv_status_reason.
+  WRITE: / 'Response   :', lv_response.
+
+  /ui2/cl_json=>deserialize(
+    EXPORTING
+      json = lv_response
+    CHANGING
+*      data = ls_header_response
+       data = ls_response ).
+
+
+
+READ TABLE ls_response-d-results INDEX 1 INTO ls_routing.
+
+IF ls_routing-productionroutinggroup IS NOT INITIAL.       "COMMENT
+*
+*  WRITE: / 'Group    :', ls_routing-productionroutinggroup.
+*  WRITE: / 'Routing  :', ls_routing-productionrouting.
+*  WRITE: / 'Sequence :', ls_routing-productionroutingsequence.
+*  WRITE: / 'Op Int ID :', ls_routing-productionroutingopintid.
+*  WRITE: / 'Version   :', ls_routing-productionroutingopintversion.
+*  WRITE: / 'Operation :', ls_routing-operation.
+*  WRITE: / 'Plant     :', ls_routing-plant.
+*  WRITE: / 'Base Qty  :', ls_routing-operationreferencequantity.
+*  WRITE: / 'Std Val 1 :', ls_routing-standardworkquantity1.
+*  WRITE: / 'Unit 1    :', ls_routing-standardworkquantityunit1.
+*  WRITE: / 'Act Type 1:', ls_routing-costctractivitytype1.
+*  WRITE: / 'Std Val 2 :', ls_routing-standardworkquantity2.
+*WRITE: / 'Unit 2    :', ls_routing-standardworkquantityunit2.
+*WRITE: / 'Act Type 2:', ls_routing-costctractivitytype2.
+*
+*WRITE: / 'Std Val 3 :', ls_routing-standardworkquantity3.
+*WRITE: / 'Unit 3    :', ls_routing-standardworkquantityunit3.
+*WRITE: / 'Act Type 3:', ls_routing-costctractivitytype3.
+*
+*WRITE: / 'Std Val 4 :', ls_routing-standardworkquantity4.
+*WRITE: / 'Unit 4    :', ls_routing-standardworkquantityunit4.
+*WRITE: / 'Act Type 4:', ls_routing-costctractivitytype4.
+*
+*WRITE: / 'Std Val 5 :', ls_routing-standardworkquantity5.
+*WRITE: / 'Unit 5    :', ls_routing-standardworkquantityunit5.
+*WRITE: / 'Act Type 5:', ls_routing-costctractivitytype5.
+ELSE.
+  WRITE: / 'No routing operation found'.
+ENDIF.
+
+
+
+ENDFORM.
+
+
+
+
+*PERFORM SEND_BATCH.
+*&---------------------------------------------------------------------*
+*& Form SEND_BATCH
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM SEND_BATCH .
+
+
+  DATA:
+    lv_batch_body TYPE string,
+    lv_batch_id   TYPE string,
+    lv_change_id  TYPE string,
+    lv_counter    TYPE i.
+
+  DATA: lv_send_start TYPE i,
+      lv_send_end   TYPE i,
+      lv_recv_start TYPE i,
+      lv_recv_end   TYPE i,
+      lv_diff       TYPE i.
+
+
+lv_batch_id = 'batch'.
+
+lv_batch_body = ``.
+
+lv_counter = 0.
+
+LOOP AT gt_batch_request INTO gs_batch_request.
+
+  lv_counter = lv_counter + 1.
+
+  lv_change_id = |changeset{ lv_counter }|.
+
+  lv_batch_body =
+    lv_batch_body &&
+    |--{ lv_batch_id }\r\n| &&
+    |Content-Type: multipart/mixed; boundary={ lv_change_id }\r\n| &&
+    |\r\n| &&
+
+    |--{ lv_change_id }\r\n| &&
+    |Content-Type: application/http\r\n| &&
+    |Content-Transfer-Encoding: binary\r\n| &&
+    |Content-ID: { lv_counter }\r\n| &&
+    |\r\n| &&
+
+    |PATCH { gs_batch_request-uri } HTTP/1.1\r\n| &&
+    |Content-Type: application/json\r\n| &&
+    |If-Match: *\r\n| &&
+    |\r\n| &&
+
+    |{ gs_batch_request-payload }\r\n| &&
+
+    |--{ lv_change_id }--\r\n|.
+
+ENDLOOP.
+
+lv_batch_body =
+  lv_batch_body &&
+  |--{ lv_batch_id }--|.
+
+
+  "------------------------------------------------------------
+  " Create HTTP client
+  "------------------------------------------------------------
+
+*  cl_http_client=>create_by_destination(
+*    EXPORTING
+*      destination = 'Z_ROUTING_API'
+*    IMPORTING
+*      client      = lo_batch_client ).
+*
+*  lo_batch_client->propertytype_logon_popup =
+*    lo_batch_client->co_disabled.
+
+  LO_CLIENT->request->set_method(
+    if_http_request=>co_request_method_post ).
+
+  LO_CLIENT->request->set_header_field(
+    name  = 'Content-Type'
+    value = 'multipart/mixed; boundary=batch' ).
+
+  LO_CLIENT->request->set_header_field(
+    name  = 'X-CSRF-Token'
+    value = lv_csrf_token ).
+
+  LO_CLIENT->request->set_header_field(
+    name  = 'Accept'
+    value = 'application/json' ).
+
+  LO_CLIENT->request->set_header_field(
+    name  = '~request_uri'
+    value = '/sap/opu/odata/sap/API_PRODUCTION_ROUTING;v=3/$batch' ).
+
+  LO_CLIENT->request->set_cdata(
+    lv_batch_body ).
+
+
+  "------------------------------------------------------------
+  " Send batch
+  "------------------------------------------------------------
+GET RUN TIME FIELD lv_send_start.
+
+  LO_CLIENT->send( ).
+
+GET RUN TIME FIELD lv_send_end.
+
+lv_diff = lv_send_end - lv_send_start.
+
+WRITE: / 'SEND time:', lv_diff, 'microseconds'.
+
+
+
+GET RUN TIME FIELD lv_recv_start.
+
+  LO_CLIENT->receive( ).
+
+GET RUN TIME FIELD lv_recv_end.
+
+lv_diff = lv_recv_end - lv_recv_start.
+
+WRITE: / 'RECEIVE time:', lv_diff, 'microseconds'.
+
+
+*  lv_status_code =
+    LO_CLIENT->response->get_status(
+      IMPORTING
+        CODE  =  LV_STATUS_CODE
+        reason = lv_status_reason ).
+
+  lv_response =
+    LO_CLIENT->response->get_cdata( ).
+
+  WRITE: / 'Batch status:', lv_status_code,
+         / 'Batch reason:', lv_status_reason.
+
+  IF lv_status_code = 202 OR lv_status_code = 200.
+
+    WRITE: / 'Batch processed successfully.',
+           / 'PATCH requests:', lv_counter.
+
+  ELSE.
+
+    WRITE: / 'Batch failed.'.
+    WRITE: / lv_response.
+
+  ENDIF.
+
+*  LO_CLIENT->close( ).
+
+  CLEAR gt_batch_request.
+
+
+
+ENDFORM.
